@@ -20,19 +20,17 @@ class XMLHandler(ContentHandler):
         self.list_tags = []
         self.tags = {'account': ['username', 'passwd'],
                      'uaserver': ['ip', 'puerto'],
-                     'rtpaudio': 'puerto',
+                     'rtpaudio': ['puerto'],
                      'regproxy': ['ip', 'puerto'],
-                     'log': 'path',
-                     'audio': 'path'}
+                     'log': ['path'],
+                     'audio': ['path']}
 
     def startElement(self, name, attrs):
         """
         Método de inicio
         """
-        print("a")
         diccionario = {}
         if name in self.tags:
-            print("B")
             diccionario['tag'] = name
             for elem in self.tags[name]:
                 diccionario[elem] = attrs.get(elem, "")
@@ -71,16 +69,18 @@ if __name__ == '__main__':
     parser = make_parser()
     listxml = XMLHandler()
     parser.setContentHandler(listxml)
-    print(CONFIG)
     parser.parse(open(CONFIG))
-    print(listxml.__str__())
-    
+    print(listxml.get_tags())
+    MLOGIN = listxml.get_tags()[0]['username']
+    MSERVER = listxml.get_tags()[1]['ip']
+    MPORT = listxml.get_tags()[1]['puerto']
+    print(MLOGIN)
+    print(MSERVER)
+    print(MPORT)
+        
 
 
-
-
-# Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
-
+#Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
 #with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
 
 #    my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -90,6 +90,9 @@ if __name__ == '__main__':
 #    my_socket.send(bytes(METHOD + ' ' + Msend, 'utf-8') + b'\r\n')
 #    data = my_socket.recv(1024)
 #    print(data.decode('utf-8'))
+
+
+
 
 #    if data.decode('utf-8').split()[1] == "100":
 #        my_socket.send(bytes("ACK" + ' ' + Msend, 'utf-8') + b'\r\n')
