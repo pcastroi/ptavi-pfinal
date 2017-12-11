@@ -1,29 +1,33 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+"""
+Programa cliente que abre un socket a un servidor
+"""
 
 import socket
 import sys
 
-# Constantes. Dirección IP del servidor y contenido a enviar
-SERVER = sys.argv[1]
-PORT = int(sys.argv[2])
-LINE = sys.argv[3]
+# Compruebo los argumentos de entrada
+if len(sys.argv) != 3:
+    sys.exit("Usage: python3 client.py method receiver@IP:SIPport")
+
+# Contenido que vamos a enviar
+METHOD = sys.argv[1]
+MLOGIN = sys.argv[2][:sys.argv[2].find('@')]
+MSERVER = sys.argv[2][sys.argv[2].find('@') + 1: sys.argv[2].find(':')]
+MPORT = sys.argv[2][sys.argv[2].rfind(':') + 1:]
 
 # Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
-    if len(sys.argv) != 6:
-        sys.exit('Usage: client.py ip puerto register sip_address expires_value')
-        
-    my_socket.connect((SERVER, PORT))
-    if LINE == 'register':
-        line = 'REGISTER sip:' + sys.argv[4] + ' SIP/2.0\r\n'
-        expr = 'Expires: ' + sys.argv[5] + ' \r\n'
-        my_socket.send(bytes(line + expr, 'utf-8') + b'\r\n')
-    else:
-        sys.exit()
-    
-    print('Enviando:', line + expr + '\r\n')
+
+    my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    my_socket.connect((MSERVER, int(MPORT)))
+
+    Msend = 'sip:' + MLOGIN + '@' + MSERVER + ' SIP/2.0\r\n'
+    my_socket.send(bytes(METHOD + ' ' + Msend, 'utf-8') + b'\r\n')
     data = my_socket.recv(1024)
-    print('Recibido -- ', data.decode('utf-8'))
-    
-print('Socket terminado.')
+    print(data.decode('utf-8'))
+
+    if data.decode('utf-8').split()[1] == "100":
+        my_socket.send(bytes("ACK" + ' ' + Msend, 'utf-8') + b'\r\n')
+    print("Conection finished.")

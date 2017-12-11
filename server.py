@@ -1,59 +1,53 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+"""
+Clase (y programa principal) para un servidor de eco en UDP simple
+"""
 
-import json
+import os
 import socketserver
 import sys
-import time
 
-class SIPRegisterHandler(socketserver.DatagramRequestHandler):
 
-    sipdic = {}
-    
-    def register2json(self):
-        json.dump(self.sipdic, open('registered.json', 'w'))
-
+class EchoHandler(socketserver.DatagramRequestHandler):
+    """
+    Echo server class
+    """
 
     def handle(self):
-        print('IP cliente: ' + self.client_address[0] + '\t'
-         + 'Puerto cliente: ' + str(self.client_address[1]))
-        listdel = []
-        for line in self.rfile:
-            decodlin = line.decode('utf-8')
-            print(decodlin)
-            if not line:
-                continue
-                
-            elif decodlin.split(' ')[0] == 'REGISTER':
-                sipusr = decodlin.split(' ')[1][decodlin.split(' ')[1].find(':') + 1 :] 
-                self.sipdic[sipusr] = [self.client_address[0], 0]
-                self.register2json()
+        while 1:
+            okinv = ("SIP/2.0 100 Trying\r\n\r\n" +
+                     "SIP/2.0 180 Ringing\r\n\r\n" + "SIP/2.0 200 OK\r\n\r\n")
+            line = self.rfile.read()
+            dcline = line.decode('utf-8').split(' ')
+            print(line.decode('utf-8'))
+            if str(dcline[0]) != '':
+                if ('sip:' not in dcline[1] or '@' not in dcline[1] or
+                   dcline[2] != 'SIP/2.0\r\n\r\n'):
+                    self.wfile.write(b"SIP/2.0 400 Bad Request\r\n\r\n")
 
-            elif decodlin.split(' ')[0] == 'Expires:':
-                expt = float(decodlin.split(' ')[1]) + time.time()
-                self.sipdic[sipusr][1] = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(expt))
-                for user in self.sipdic:
-                    if self.sipdic[user][1] <= time.strftime('%Y-%m-%d %H:%M:%S',
-                     time.gmtime(time.time())):
-                        listdel.append(user)
-                        print('Tiempo expirado')
+                else:
+                    if dcline[0] == 'INVITE':
+                        self.wfile.write(bytes(okinv, 'utf-8'))
+
+                    elif dcline[0] == 'ACK':
+                        os.system('./mp32rtp -i 127.0.0.1 -p 23032 < ' +
+                                  sys.argv[3])
+
+                    elif dcline[0] == 'BYE':
+                        self.wfile.write(b"SIP/2.0 200 OK\r\n\r\n")
+
                     else:
-                        print('Tiempo no expirado')
-                
-                for user in listdel:
-                    del self.sipdic[user]
-                    print('Diccionario:', self.sipdic)
-                self.register2json()
-                self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
-            else:
-                pass
-   
+                        self.wfile.write(bytes("SIP/2.0 405 Method Not " +
+                                               "Allowed\r\n\r\n", 'utf-8'))
+
+            if not line:
+                break
+
 if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        sys.exit("Usage: python3 server.py IP port audio_file")
 
-    serv = socketserver.UDPServer(('', int(sys.argv[1])), SIPRegisterHandler) 
-
-    print("Lanzando servidor UDP de eco...")
-    try:
-        serv.serve_forever()
-    except KeyboardInterrupt:
-        print("Finalizado servidor")
+    serv = socketserver.UDPServer((sys.argv[1], int(sys.argv[2])), EchoHandler)
+    print("Listening...")
+    serv.serve_forever()
