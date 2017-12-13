@@ -56,9 +56,6 @@ class XMLHandler(ContentHandler):
         return(''.join(listcad))
 
 if __name__ == '__main__':
-    # Compruebo los argumentos de entrada
-    if len(sys.argv) != 4:
-        sys.exit("Usage: python uaclient.py config method option")
 
     # Argumentos que me pasan como parámetros
     CONFIG = sys.argv[1]
@@ -77,23 +74,54 @@ if __name__ == '__main__':
     print(MLOGIN)
     print(MSERVER)
     print(MPORT)
+
+        
+#Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
+
+    my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    my_socket.connect((MSERVER, int(MPORT)))
+    # Compruebo los argumentos de entrada(nº de parámetros y si son correctos o no)
+    if len(sys.argv) != 4
+        sys.exit("Usage: python3 uaclient.py config method option")
+    if METHOD == "REGISTER": #Asumimos que el valor de option es un Expires correcto
+        try:
+            int(OPTION)
+        except ValueError:
+            sys.exit("Usage: python3 uaclient.py config method option")
+        
+        msend = METHOD + ' sip:' + MLOGIN + ':' + MSERVER + ' SIP/2.0\r\n' + "Expires: " + OPTION
+        my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
+        data = my_socket.recv(1024)
+        print(data.decode('utf-8'))
+        if  
+            
+            
+            
+            
+    elif METHOD == "INVITE":
+        if '@' not in OPTION or '.com' not in OPTION:
+            sys.exit("Usage: python3 uaclient.py config method option")
+        else:
+        
+    elif METHOD == "BYE":    
+        if '@' not in OPTION or '.com' not in OPTION:
+            sys.exit("Usage: python3 uaclient.py config method option")
+        else:
+        
+    else:
+        sys.exit("Usage: python3 uaclient.py config method option")
         
 
 
-#Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
-#with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
-
-#    my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#    my_socket.connect((MSERVER, int(MPORT)))
-
-#    Msend = 'sip:' + MLOGIN + '@' + MSERVER + ' SIP/2.0\r\n'
-#    my_socket.send(bytes(METHOD + ' ' + Msend, 'utf-8') + b'\r\n')
-#    data = my_socket.recv(1024)
-#    print(data.decode('utf-8'))
+    Msend = 'sip:' + MLOGIN + '@' + MSERVER + ' SIP/2.0\r\n'
+    my_socket.send(bytes(METHOD + ' ' + Msend, 'utf-8') + b'\r\n')
+    data = my_socket.recv(1024)
+    print(data.decode('utf-8'))
 
 
 
-
-#    if data.decode('utf-8').split()[1] == "100":
-#        my_socket.send(bytes("ACK" + ' ' + Msend, 'utf-8') + b'\r\n')
-#    print("Conection finished.")
+#Añadir la autenticación del register
+    if data.decode('utf-8').split()[1] == "100":
+        my_socket.send(bytes("ACK" + ' ' + Msend, 'utf-8') + b'\r\n')
+    print("Conection finished.")
