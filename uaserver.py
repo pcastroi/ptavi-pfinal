@@ -7,6 +7,7 @@ Clase (y programa principal) para un servidor de eco en UDP simple
 import os
 import socketserver
 import sys
+import uaclient
 
 
 class EchoHandler(socketserver.DatagramRequestHandler):
@@ -45,6 +46,19 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                 break
 
 if __name__ == "__main__":
+
+    # Argumento que me pasan como parámetros
+    CONFIG = sys.argv[1]
+
+    DATAXML = uaclient.parser_xml(CONFIG)
+
+
+
+
+
+
+
+
     if len(sys.argv) != 4:
         sys.exit("Usage: python3 server.py IP port audio_file")
 

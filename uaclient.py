@@ -41,19 +41,13 @@ class XMLHandler(ContentHandler):
         Devuelve la lista
         """
         return self.list_tags
-        
-    def __str__(self):
-        """
-        Devuelve una cadena de texto con todas las etiquetas y atributos
-        """
-        listcad = []
-        for dic in self.list_tags:
-            listcad.append(dic['tag'])
-            for atribs in dic:
-                if atribs != 'tag' and dic[atribs]:
-                    listcad.append('\t' + atribs + '=' + dic[atribs] + '\t')
-            listcad.append('\n')
-        return(''.join(listcad))
+
+def parser_xml(fxml) #Función que dado un fichero xml, devuelve una lista de diccionarios
+    parser = make_parser()
+    listxml = XMLHandler()
+    parser.setContentHandler(listxml)
+    parser.parse(open(fxml))
+    return listxml.get_tags()
 
 if __name__ == '__main__':
 
@@ -63,14 +57,13 @@ if __name__ == '__main__':
     OPTION = sys.argv[3]
 
 
-    parser = make_parser()
-    listxml = XMLHandler()
-    parser.setContentHandler(listxml)
-    parser.parse(open(CONFIG))
+    DATAXML = parser_xml(CONFIG)
     print(listxml.get_tags())
-    MLOGIN = listxml.get_tags()[0]['username']
-    MSERVER = listxml.get_tags()[1]['ip']
-    MPORT = listxml.get_tags()[1]['puerto']
+    
+    MLOGIN = DATAXML[0]['username']
+    MSERVER = DATAXML['ip']
+    MPORT = DATAXML['puerto']
+    RTPPORT = DATAXML['puerto']
     print(MLOGIN)
     print(MSERVER)
     print(MPORT)
@@ -90,20 +83,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
         except ValueError:
             sys.exit("Usage: python3 uaclient.py config method option")
         
-        msend = METHOD + ' sip:' + MLOGIN + ':' + MSERVER + ' SIP/2.0\r\n' + "Expires: " + OPTION
+        msend = METHOD + ' sip:' + MLOGIN + ':' + MSERVER + ' SIP/2.0\r\n' + "Expires: " + OPTION + '\r\n'
         my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
-        data = my_socket.recv(1024)
-        print(data.decode('utf-8'))
-        if  
-            
-            
-            
-            
+    
     elif METHOD == "INVITE":
-        if '@' not in OPTION or '.com' not in OPTION:
+        if '@' not in OPTION or '.' not in OPTION:
             sys.exit("Usage: python3 uaclient.py config method option")
         else:
-        
+            msend = METHOD + ' sip:' + OPTION + ' SIP/2.0\r\n' + 'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' + 'o=' + MLOGIN + ' ' + MSERVER + '\r\n' + 's=mysession\r\n' + 't=0\r\n' + 'm=audio ' + RTPPORT + 'RTP\r\n'
+            my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
     elif METHOD == "BYE":    
         if '@' not in OPTION or '.com' not in OPTION:
             sys.exit("Usage: python3 uaclient.py config method option")
@@ -112,16 +100,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
     else:
         sys.exit("Usage: python3 uaclient.py config method option")
         
-
-
-    Msend = 'sip:' + MLOGIN + '@' + MSERVER + ' SIP/2.0\r\n'
-    my_socket.send(bytes(METHOD + ' ' + Msend, 'utf-8') + b'\r\n')
     data = my_socket.recv(1024)
     print(data.decode('utf-8'))
 
 
 
-#Añadir la autenticación del register
+    #Añadir la autenticación del register
+    #if data.decode('utf-8').split()[1] == "401":
+    #    msend = msend + 
+    #    my_socket.send(bytes(msend , 'utf-8') + b'\r\n')
     if data.decode('utf-8').split()[1] == "100":
         my_socket.send(bytes("ACK" + ' ' + Msend, 'utf-8') + b'\r\n')
     print("Conection finished.")
