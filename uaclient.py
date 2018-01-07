@@ -4,6 +4,7 @@
 Programa User Agent Client
 """
 
+import os
 import socket
 import sys
 from xml.sax import make_parser
@@ -17,70 +18,68 @@ class XMLHandler(ContentHandler):
         """
         Constructor. Inicializamos las variables
         """
-        self.list_tags = []
-        self.tags = {'account': ['username', 'passwd'],
-                     'uaserver': ['ip', 'puerto'],
-                     'rtpaudio': ['puerto'],
-                     'regproxy': ['ip', 'puerto'],
-                     'log': ['path'],
-                     'audio': ['path']}
+        self.tags = []
+        self.list_tags = ["account", "uaserver", "rtpaudio", 
+                          "regproxy","log", "audio"]
+        self.dict_attrs = {'account': ['username', 'passwd'],
+                           'uaserver': ['ip', 'puerto'],
+                           'rtpaudio': ['puerto'],
+                           'regproxy': ['ip', 'puerto'],
+                           'log': ['path'],
+                           'audio': ['path']}
 
     def startElement(self, name, attrs):
         """
         Método de inicio
         """
-        diccionario = {}
-        if name in self.tags:
+       
+        if name in self.list_tags:
+            diccionario = {}
             diccionario['tag'] = name
-            for elem in self.tags[name]:
-                diccionario[elem] = attrs.get(elem, "")
-            self.list_tags.append(diccionario)
+            for atributo in self.dict_attrs[name]:
+                diccionario[atributo] = attrs.get(atributo, "")
+            self.tags.append(diccionario)
 
     def get_tags(self):
         """
         Devuelve la lista
         """
-        return self.list_tags
+        return self.tags
         
-    def parser_xml(fxml):
-        """
-        Función que dado un fichero xml, devuelve una lista de diccionarios
-        """   
-        parser = make_parser()
-        listxml = XMLHandler()
-        parser.setContentHandler(listxml)
-        parser.parse(open(fxml))
-        return listxml.get_tags()
+def parser_xml(fxml):
+    """
+    Función que dado un fichero xml, devuelve una lista de diccionarios
+    """   
+    parser = make_parser()
+    handxml = XMLHandler()
+    parser.setContentHandler(handxml)
+    parser.parse(open(fxml))
+    return (handxml.get_tags())
 
 if __name__ == '__main__':
-
+    """
+    Programa principal
+    """   
     #Compruebo los argumentos de entrada(nº de parámetros y si son correctos o no)
     if len(sys.argv) != 4:
         sys.exit("Usage: python3 uaclient.py config method option")
-        
-    # Argumentos que me pasan como parámetros
-    CONFIG = sys.argv[1]
-    METHOD = sys.argv[2]
-    OPTION = sys.argv[3]
 
-    DATAXML = parser_xml(CONFIG)
-    print(listxml.get_tags())
+    DATAXML = parser_xml(sys.argv[1])
     print(DATAXML)
     
+    #Variables que vamos a usar
+    METHOD = sys.argv[2]
+    OPTION = sys.argv[3]
     MLOGIN = DATAXML[0]['username']
-    MSERVER = DATAXML['ip']
-    MPORT = DATAXML['puerto']
-    RTPPORT = DATAXML['puerto']
-    print(MLOGIN)
-    print(MSERVER)
-    print(MPORT)
-
+    MSERVER = DATAXML[1]['ip']
+    MSPORT = DATAXML[1]['puerto']
+    RTPPORT = DATAXML[2]['puerto']
         
 #Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
 
     my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    my_socket.connect((MSERVER, int(MPORT)))
+    my_socket.connect((MSERVER, int(MSPORT)))
 
     if METHOD == "REGISTER": #Asumimos que el valor de option es un Expires correcto
         try:
