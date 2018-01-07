@@ -41,24 +41,31 @@ class XMLHandler(ContentHandler):
         Devuelve la lista
         """
         return self.list_tags
-
-def parser_xml(fxml) #Función que dado un fichero xml, devuelve una lista de diccionarios
-    parser = make_parser()
-    listxml = XMLHandler()
-    parser.setContentHandler(listxml)
-    parser.parse(open(fxml))
-    return listxml.get_tags()
+        
+    def parser_xml(fxml):
+        """
+        Función que dado un fichero xml, devuelve una lista de diccionarios
+        """   
+        parser = make_parser()
+        listxml = XMLHandler()
+        parser.setContentHandler(listxml)
+        parser.parse(open(fxml))
+        return listxml.get_tags()
 
 if __name__ == '__main__':
 
+    #Compruebo los argumentos de entrada(nº de parámetros y si son correctos o no)
+    if len(sys.argv) != 4:
+        sys.exit("Usage: python3 uaclient.py config method option")
+        
     # Argumentos que me pasan como parámetros
     CONFIG = sys.argv[1]
     METHOD = sys.argv[2]
     OPTION = sys.argv[3]
 
-
     DATAXML = parser_xml(CONFIG)
     print(listxml.get_tags())
+    print(DATAXML)
     
     MLOGIN = DATAXML[0]['username']
     MSERVER = DATAXML['ip']
@@ -74,9 +81,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
 
     my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     my_socket.connect((MSERVER, int(MPORT)))
-    # Compruebo los argumentos de entrada(nº de parámetros y si son correctos o no)
-    if len(sys.argv) != 4
-        sys.exit("Usage: python3 uaclient.py config method option")
+
     if METHOD == "REGISTER": #Asumimos que el valor de option es un Expires correcto
         try:
             int(OPTION)
@@ -90,12 +95,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
         if '@' not in OPTION or '.' not in OPTION:
             sys.exit("Usage: python3 uaclient.py config method option")
         else:
-            msend = METHOD + ' sip:' + OPTION + ' SIP/2.0\r\n' + 'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' + 'o=' + MLOGIN + ' ' + MSERVER + '\r\n' + 's=mysession\r\n' + 't=0\r\n' + 'm=audio ' + RTPPORT + 'RTP\r\n'
+            msend = METHOD + ' sip:' + OPTION + ' SIP/2.0\r\n' 
+            + 'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' 
+            + 'o=' + MLOGIN + ' ' + MSERVER + '\r\n' + 's=mysession\r\n' 
+            + 't=0\r\n' + 'm=audio ' + RTPPORT + 'RTP\r\n'
             my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
     elif METHOD == "BYE":    
         if '@' not in OPTION or '.com' not in OPTION:
             sys.exit("Usage: python3 uaclient.py config method option")
-        else:
+        #else:
         
     else:
         sys.exit("Usage: python3 uaclient.py config method option")
