@@ -13,7 +13,7 @@ class SHandler(socketserver.DatagramRequestHandler):
     '''
     Echo server class
     '''
-    def handle(self):
+    def handle(self):#Falta el sdp cuando mando 200 ok
         while 1:
             okinv = ('SIP/2.0 100 Trying\r\n\r\n' +
                      'SIP/2.0 180 Ringing\r\n\r\n' + 'SIP/2.0 200 OK\r\n\r\n')
@@ -56,7 +56,6 @@ if __name__ == '__main__':
         MSERVER = '127.0.0.1'
     MSPORT = DATAXML[1]['puerto']
     print(DATAXML)
-    
     serv = socketserver.UDPServer((MSERVER, int(MSPORT)), SHandler)
     print('Listening...')
     serv.serve_forever()

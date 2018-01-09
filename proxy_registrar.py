@@ -80,12 +80,14 @@ class PHandler(socketserver.DatagramRequestHandler):
                      'SIP/2.0 200 OK\r\n\r\n')
             line = self.rfile.read()
             dcline = line.decode('utf-8').split(' ')
+            lines = line.decode('utf-8').split('\r\n')
             print(line.decode('utf-8'))
             if str(dcline[0]) != '':
-                if ('sip:' not in dcline[1] or '@' not in dcline[1] or dcline[2] != 'SIP/2.0\r\n\r\n'):
+                if ('sip:' not in lines[0].split(' ')[1] or '@' not in lines[0].split(' ')[1] or lines[0].split(' ')[2] != 'SIP/2.0\r\n\r\n'):
                     self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
 
                 else:
+                    print('NO ENVIA BAD REQUEST')
                     if dcline[0] == 'REGISTER':
                         SaveReg(line, self.dicdb)
                         
