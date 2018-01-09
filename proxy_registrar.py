@@ -1,59 +1,69 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import json
 import socketserver
 import sys
 import time
 
-class SIPRegisterHandler(socketserver.DatagramRequestHandler):
+class XMLHandler(ContentHandler):
 
-    sipdic = {}
-    
-    def register2json(self):
-        json.dump(self.sipdic, open('registered.json', 'w'))
+    def __init__(self):
+        '''
+        Constructor. Inicializamos las variables
+        '''
+        self.tags = []
+        self.list_tags = ['server', 'database', 'log']
+        self.dict_attrs = {'server': ['name', 'ip', 'puerto'],
+                           'database': ['path', 'passwdpath'],
+                           'log': ['path']}
 
+    def startElement(self, name, attrs):
+        '''
+        Método de inicio
+        '''
+        if name in self.list_tags:
+            diccionario = {}
+            diccionario['tag'] = name
+            for atributo in self.dict_attrs[name]:
+                diccionario[atributo] = attrs.get(atributo, '')
+            self.tags.append(diccionario)
 
-    def handle(self):
-        print('IP cliente: ' + self.client_address[0] + '\t'
-         + 'Puerto cliente: ' + str(self.client_address[1]))
-        listdel = []
-        for line in self.rfile:
-            decodlin = line.decode('utf-8')
-            print(decodlin)
-            if not line:
-                continue
-                
-            elif decodlin.split(' ')[0] == 'REGISTER':
-                sipusr = decodlin.split(' ')[1][decodlin.split(' ')[1].find(':') + 1 :] 
-                self.sipdic[sipusr] = [self.client_address[0], 0]
-                self.register2json()
+    def get_tags(self):
+        '''
+        Devuelve la lista
+        '''
+        return self.tags
+        
+def parser_xml(fxml):
+    '''
+    Función que dado un fichero xml, devuelve una lista de diccionarios
+    '''   
+    parser = make_parser()
+    handxml = XMLHandler()
+    parser.setContentHandler(handxml)
+    parser.parse(open(fxml))
+    return (handxml.get_tags())
 
-            elif decodlin.split(' ')[0] == 'Expires:':
-                expt = float(decodlin.split(' ')[1]) + time.time()
-                self.sipdic[sipusr][1] = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(expt))
-                for user in self.sipdic:
-                    if self.sipdic[user][1] <= time.strftime('%Y-%m-%d %H:%M:%S',
-                     time.gmtime(time.time())):
-                        listdel.append(user)
-                        print('Tiempo expirado')
-                    else:
-                        print('Tiempo no expirado')
-                
-                for user in listdel:
-                    del self.sipdic[user]
-                    print('Diccionario:', self.sipdic)
-                self.register2json()
-                self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
-            else:
-                pass
-   
 if __name__ == "__main__":
 
-    serv = socketserver.UDPServer(('', int(sys.argv[1])), SIPRegisterHandler) 
+    if len(sys.argv) != 2:
+        sys.exit('Usage: python3 proxy_registrar.py config')
 
-    print("Lanzando servidor UDP de eco...")
+    DATAXML = parser_xml(sys.argv[1])
+    print(DATAXML)
+    
+    #Variables que vamos a usar
+    PNAME = DATAXML[0]['name']
+    if NAME == '':
+        NAME = 'default'
+    PSERVER = DATAXML[0]['ip']
+    if MSERVER == '':
+        MSERVER = '127.0.0.1'
+    PSPORT = DATAXML[0]['puerto']
+    DBP = DATAXML[1]['path']
+    DBPSWDP = DATAXML[1]['passwdpath']
+    LOGP = DATAXML[2]['path']
     try:
         serv.serve_forever()
     except KeyboardInterrupt:
-        print("Finalizado servidor")
+        print("Finalizado servidor proxy")
