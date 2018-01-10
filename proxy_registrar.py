@@ -46,6 +46,14 @@ def proxy_parser_xml(fxml):
     parser.parse(open(fxml))
     return (handxml.get_tags())
 
+def DoPassword(path, user):
+    fich = open(path, "r")
+    lineas= fich.readlines()
+    for linea in lineas:
+        if linea.split(' ')[0] == user:
+            password = linea.split(' ')[1]
+return password
+
 class PHandler(socketserver.DatagramRequestHandler):
     '''
     Handler del Proxy
@@ -56,18 +64,50 @@ class PHandler(socketserver.DatagramRequestHandler):
     dbpasswpath = datos[1]['passwdpath']
     logpath = datos[2]['path']
     
-    dicdb = {} #Diccionario en el que se van a guardar los usuarios
-               #
+    dicdb = {} #Diccionario de listas en el que se van a guardar los usuarios
+               #Key: Username; Value: lista que tiene username, userip,
+               #userport, userdate(desde 1970) y userexp
     def Register(self, data):
         '''
         Funcion para guardar los datos de usuario en un diccionario
         '''
+        nonce = '767676'
         user = data[0].split(':')[1]
         userip = self.client_address[0]
         userport = data[0].split(' ')[1].split(':')[2]
         userdate = time.time()
         userexp = data[1].split(':')[1][1:]
+        if user in self.dicdb:
+            self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+            #log
+            self.dicdb[user][3] = userdate
+            self.dicdb[user][4] = userexp
+        else:
+            try:
+                if data[2].split(':') == 'Authorization':
+                    password = DoPassword(self.datos[1]['passwdpath'], user)
+                    print(password)
+                    h = hashlib.sha1(bytes(password, 'utf-8'))
+                    h.update(bytes(nonce, 'utf-8'))
+                    if data[2].split('=')[1].split('\r')[0][1:-1] == h.hexdigest():
+                        #ok, añadir al dic y al fichero y log
+            except IndexError:
+                self.wfile.write(b'SIP/2.0 401 Unauthorized' + '\r\n' +
+                                  'WWW-Authenticate: Digest nonce="' + 
+                                   nonce + '"' + '\r\n\r\n')
+                #log
+                pass
+            #falta el caso de que la autorización no sea correcta
+            self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+            self.dicdb[user] = [user, userip, userport, userdate, userexp]
+            
+            
+            
+            
+            
         print(user, userip, userport, userdate, userexp)
+        
+        
 
     def handle(self):
     
@@ -76,6 +116,7 @@ class PHandler(socketserver.DatagramRequestHandler):
         for line in self.rfile:
             DATOS.append(line.decode('utf-8'))
         #Si la petición está mal formada --> 400
+        print(DATOS)
         if ('sip:' not in DATOS[0].split(' ')[1] 
             or '@' not in DATOS[0].split(' ')[1] 
             or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
@@ -83,6 +124,7 @@ class PHandler(socketserver.DatagramRequestHandler):
         else:
             if DATOS[0].split(' ')[0] == 'REGISTER':
                 self.Register(DATOS)
+                print(self.dicdb)
             elif DATOS[0].split(' ')[0] == 'INVITE':#IP y Puerto guardados(nombre) con el register
                 print('INVITE')
             #elif dcline[0] == 'ACK':
@@ -99,7 +141,7 @@ class PHandler(socketserver.DatagramRequestHandler):
       
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
     if len(sys.argv) != 2:
         sys.exit('Usage: python3 proxy_registrar.py config')
@@ -118,4 +160,4 @@ if __name__ == "__main__":
         print('Server ' + username + ' listening at port ' + proxyport + '...')
         serv.serve_forever()
     except KeyboardInterrupt:
-        print("Finalizado servidor proxy")
+        print('Finalizado servidor proxy')
