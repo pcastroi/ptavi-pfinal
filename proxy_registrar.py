@@ -79,24 +79,27 @@ class PHandler(socketserver.DatagramRequestHandler):
                      'SIP/2.0 180 Ringing\r\n\r\n' + 
                      'SIP/2.0 200 OK\r\n\r\n')
             line = self.rfile.read()
-            dcline = line.decode('utf-8').split(' ')
             lines = line.decode('utf-8').split('\r\n')
-            print(line.decode('utf-8'))
-            if str(dcline[0]) != '':
-                if ('sip:' not in lines[0].split(' ')[1] or '@' not in lines[0].split(' ')[1] or lines[0].split(' ')[2] != 'SIP/2.0\r\n\r\n'):
+            cutline = lines[0].split(' ')
+            
+            print('lines = ',lines)
+            print('cutline = ',cutline)
+            #Si la petición está mal formada --> 400
+            if lines[0] != '':
+                if ('sip:' not in lines[0].split(' ')[1] 
+                    or '@' not in lines[0].split(' ')[1] 
+                    or lines[0].split(' ')[2] != 'SIP/2.0'):
                     self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
-
                 else:
-                    print('NO ENVIA BAD REQUEST')
-                    if dcline[0] == 'REGISTER':
-                        SaveReg(line, self.dicdb)
+                    if cutline[0] == 'REGISTER':
+                        DicReg(line, self.dicdb)
                         
-                    elif dcline[0] == 'INVITE':#IP y Puerto guardados(nombre) con el register
+                    elif cutline[0] == 'INVITE':#IP y Puerto guardados(nombre) con el register
                         print('INVITE')
                     #elif dcline[0] == 'ACK':
                         #os.system('./mp32rtp -i 127.0.0.1 -p 23032 < ' + sys.argv[3])
 
-                    elif dcline[0] == 'BYE':
+                    elif cutline[0] == 'BYE':
                         self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
                         
                     #401 y 404

@@ -79,76 +79,85 @@ if __name__ == '__main__':
     #Variables que vamos a usar
     METHOD = sys.argv[2]
     OPTION = sys.argv[3]
-    MLOGIN = DATAXML[0]['username']
+    USER = DATAXML[0]['username']
     RTPPORT = DATAXML[2]['puerto']
-    PLOG = DATAXML[4]['path']
-    MPROXY = DATAXML[3]['ip']
-    MPPORT = DATAXML[3]['puerto']
-    CLog('Starting...', PLOG)
+    LOGPATH = DATAXML[4]['path']
+    PROXYIP = DATAXML[3]['ip']
+    PROXYPORT = DATAXML[3]['puerto']
+    SERVERIP = DATAXML[1]['ip']
+    if SERVERIP == '':
+        SERVERIP = '127.0.0.1'
+    SERVERPORT = DATAXML[1]['puerto']
+    CLog('Starting...', LOGPATH)
         
     #Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
 
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        my_socket.connect((MPROXY, int(MPPORT)))
+        my_socket.connect((PROXYIP, int(PROXYPORT)))
         
-        #Asumimos que el valor de option es un Expires correcto
+        #Register: Asumimos que el valor de option es un Expires correcto
         if METHOD == 'REGISTER': 
             try:
                 int(OPTION)
             except ValueError:
                 sys.exit('Usage: python3 uaclient.py config method option')
-                CLog('Finishing.', PLOG)
+                CLog('Finishing.', LOGPATH)
                     
-            msend = (METHOD + ' sip:' + MLOGIN + ':' + MPPORT +
+            msend = (METHOD + ' sip:' + USER + ':' + SERVERPORT +
                      ' SIP/2.0\r\n' + 'Expires: ' + OPTION + '\r\n')
             print(msend)
-            CLog('Sent to ' + MPROXY + ':' + MPPORT + ': ' + msend, PLOG)
+            CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
             my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
             
+        #Invite 
         elif METHOD == 'INVITE':
             if '@' not in OPTION or '.' not in OPTION:
+                CLog('Finishing.', LOGPATH)
                 sys.exit('Usage: python3 uaclient.py config method option')
-                CLog('Finishing.', PLOG)
             else:
                 msend = (METHOD + ' sip:' + OPTION + ' SIP/2.0\r\n' +
                          'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
-                         'o=' + MLOGIN + ' ' + MPROXY + '\r\n' + 's=mysession\r\n' +
+                         'o=' + USER + ' ' + PROXYIP + '\r\n' + 's=mysession\r\n' +
                          't=0\r\n' + 'm=audio ' + RTPPORT + ' RTP\r\n')
                 print(msend)
-                CLog('Sent to ' + MPROXY + ':' + MPPORT + ': ' + msend, PLOG)
+                CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
                 my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
                 
+        #Bye 
         elif METHOD == 'BYE':    
             if '@' not in OPTION or '.com' not in OPTION:
+                CLog('Finishing.', LOGPATH)
                 sys.exit('Usage: python3 uaclient.py config method option')
-                CLog('Finishing.', PLOG)
             else:
                 my_socket.send(bytes('BYE sip:' + OPTION + ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
-                CLog('Sent to ' + MPROXY + ':' + MPPORT + ': ' + 'BYE sip:' + OPTION + ' SIP/2.0\r\n', PLOG)
+                CLog('Sent to ' + PROXYIP + ':' + PROXYPORT +
+                     ': ' + 'BYE sip:' + OPTION + ' SIP/2.0\r\n', LOGPATH)
+                
+        #Excepción si el método introducido no es válido 
         else:
-            CLog('Finishing.', PLOG)
+            CLog('Finishing.', LOGPATH)
             sys.exit('Usage: python3 uaclient.py config method option')
             
         try:   
             data = my_socket.recv(1024)
             print(data.decode('utf-8'))
-            CLog(data.decode('utf-8'), PLOG)
-        #Este error deberia salir al interntar conectar un ua con el servidor proxy apagado.
+            CLog('Received from ' + PROXYIP + ':' + PROXYPORT + 
+                 ': ' + data.decode('utf-8'), LOGPATH)
+        #Este error deberia salir al intentar conectar un ua con el servidor proxy apagado.
         except ConnectionRefusedError:
-            CLog('Error: No server listening at ' + MPROXY + ' port ' + MPPORT, PLOG)
-            CLog('Finishing.', PLOG)
+            CLog('Error: No server listening at ' + PROXYIP + ' port ' + PROXYPORT, LOGPATH)
+            CLog('Finishing.', LOGPATH)
             sys.exit()
             
-        CLog('Received from ', PLOG)
         #Autorización del cliente
         if data.decode('utf-8').split()[1] == '401':
             msend = msend + '\r\n' + 'Authorization: Digest response="123123212312321212123"'
             my_socket.send(bytes(msend , 'utf-8') + b'\r\n')
-            CLog('Sent to ' + MPROXY + ':' + MPPORT + ': ' + msend, PLOG)
+            CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
         #Envio del ACK
         if data.decode('utf-8').split()[1] == '100':
             my_socket.send(bytes('ACK sip:' + OPTION + ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
-            CLog('Sent to ' + MPROXY + ':' + MPPORT + ': ' + 'ACK sip:' + OPTION + ' SIP/2.0\r\n', PLOG)
+            CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + 'ACK sip:' + OPTION + ' SIP/2.0\r\n', LOGPATH)
             
-        CLog('Finishing.', PLOG)
+        CLog('Finishing.', LOGPATH)
