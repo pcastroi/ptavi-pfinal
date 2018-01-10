@@ -1,8 +1,8 @@
 <config>
-    <account username="Joker" passwd="harleyquinn"/>
+    <account username="joker@arkham.com" passwd="harleyquinn"/>
     <uaserver ip="127.0.0.1" puerto="6001"/>
     <rtpaudio puerto="5060"/>
-    <regproxy ip="240.0.0.1" puerto="4002"/>
-    <log path=".">
-    <audio path=".">
+    <regproxy ip="127.0.0.1" puerto="6002"/>
+    <log path="ua2log.txt"/>
+    <audio path="cancion.mp3"/>
 </config>
