@@ -35,83 +35,7 @@ class PXMLHandler(ContentHandler):
         Devuelve la lista
         '''
         return self.tags
-        
-        
-        
-        
-def DicReg(data, dic):
-    '''
-    Funcion para guardar los datos de usuario en un diccionario
-    '''
-    regline = data.readlines()[0].split(' ')[1]
-    user = regline.split(':')[1]
-    userip = self.client_address[0]
-    userport = regline.split(':')[2]
-    userdate = time.time()
-    userexp = data.readlines()[1].split(' ')[1]
-    '''
-    información relativa a un usuario, en particular, su dirección, su
-    IP, su puerto, la fecha del registro (en segundos desde el 1 de enero de 1970) y el
-    tiempo de expiración (en segundos).
-    '''
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-class PHandler(socketserver.DatagramRequestHandler):
-    '''
-    Handler del Proxy
-    '''
-    dicdb = {}
-    def handle(self):
-        while 1:
-            okinv = ('SIP/2.0 100 Trying\r\n\r\n' +
-                     'SIP/2.0 180 Ringing\r\n\r\n' + 
-                     'SIP/2.0 200 OK\r\n\r\n')
-            line = self.rfile.read()
-            lines = line.decode('utf-8').split('\r\n')
-            cutline = lines[0].split(' ')
-            
-            print('lines = ',lines)
-            print('cutline = ',cutline)
-            #Si la petición está mal formada --> 400
-            if lines[0] != '':
-                if ('sip:' not in lines[0].split(' ')[1] 
-                    or '@' not in lines[0].split(' ')[1] 
-                    or lines[0].split(' ')[2] != 'SIP/2.0'):
-                    self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
-                else:
-                    if cutline[0] == 'REGISTER':
-                        DicReg(line, self.dicdb)
-                        
-                    elif cutline[0] == 'INVITE':#IP y Puerto guardados(nombre) con el register
-                        print('INVITE')
-                    #elif dcline[0] == 'ACK':
-                        #os.system('./mp32rtp -i 127.0.0.1 -p 23032 < ' + sys.argv[3])
-
-                    elif cutline[0] == 'BYE':
-                        self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
-                        
-                    #401 y 404
-
-                    else:
-                        self.wfile.write(bytes('SIP/2.0 405 Method Not ' +
-                                               'Allowed\r\n\r\n', 'utf-8'))
-
-            if not line:
-                break
-
-      
 def proxy_parser_xml(fxml):
     '''
     Función que dado un fichero xml, devuelve una lista de diccionarios
@@ -122,28 +46,76 @@ def proxy_parser_xml(fxml):
     parser.parse(open(fxml))
     return (handxml.get_tags())
 
+class PHandler(socketserver.DatagramRequestHandler):
+    '''
+    Handler del Proxy
+    '''
+    
+    datos = proxy_parser_xml(sys.argv[1])
+    dbpath = datos[1]['path']
+    dbpasswpath = datos[1]['passwdpath']
+    logpath = datos[2]['path']
+    
+    dicdb = {} #Diccionario en el que se van a guardar los usuarios
+               #
+    def Register(self, data):
+        '''
+        Funcion para guardar los datos de usuario en un diccionario
+        '''
+        user = data[0].split(':')[1]
+        userip = self.client_address[0]
+        userport = data[0].split(' ')[1].split(':')[2]
+        userdate = time.time()
+        userexp = data[1].split(':')[1][1:]
+        print(user, userip, userport, userdate, userexp)
+
+    def handle(self):
+    
+        DATOS = []
+        
+        for line in self.rfile:
+            DATOS.append(line.decode('utf-8'))
+        #Si la petición está mal formada --> 400
+        if ('sip:' not in DATOS[0].split(' ')[1] 
+            or '@' not in DATOS[0].split(' ')[1] 
+            or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
+            self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+        else:
+            if DATOS[0].split(' ')[0] == 'REGISTER':
+                self.Register(DATOS)
+            elif DATOS[0].split(' ')[0] == 'INVITE':#IP y Puerto guardados(nombre) con el register
+                print('INVITE')
+            #elif dcline[0] == 'ACK':
+                #os.system('./mp32rtp -i 127.0.0.1 -p 23032 < ' + sys.argv[3])
+            elif DATOS[0].split(' ')[0] == 'BYE':
+                self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+                 
+                #401 y 404
+
+            else:
+                self.wfile.write(bytes('SIP/2.0 405 Method Not ' +
+                                               'Allowed\r\n\r\n', 'utf-8'))
+
+      
+
+
 if __name__ == "__main__":
 
     if len(sys.argv) != 2:
         sys.exit('Usage: python3 proxy_registrar.py config')
-
-    DATAXML = proxy_parser_xml(sys.argv[1])
     
-    #Variables que vamos a usar
-    PNAME = DATAXML[0]['name']
-    if PNAME == '':
-        PNAME = 'default'
-    PSERVER = DATAXML[0]['ip']
-    if PSERVER == '':
-        PSERVER = '127.0.0.1'
-    PSPORT = DATAXML[0]['puerto']
-    DBP = DATAXML[1]['path']
-    DBPSWDP = DATAXML[1]['passwdpath']
-    LOGP = DATAXML[2]['path']
+    datos = proxy_parser_xml(sys.argv[1])
+    username = datos[0]['name']
+    if username == '':
+        username = 'default'
+    proxyip = datos[0]['ip']
+    if proxyip == '':
+        proxyip = '127.0.0.1'
+    proxyport = datos[0]['puerto']
     try:
-        print('Server ' + PNAME + ' listening at port ' + PSPORT + '...')
-        serv = socketserver.UDPServer((PSERVER, int(PSPORT)), PHandler)
+
+        serv = socketserver.UDPServer((proxyip, int(proxyport)), PHandler)
+        print('Server ' + username + ' listening at port ' + proxyport + '...')
         serv.serve_forever()
-        
     except KeyboardInterrupt:
         print("Finalizado servidor proxy")
