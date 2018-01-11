@@ -66,7 +66,26 @@ def CLog(data, log):
     data = data.replace('\r\n',' ')
     flog.write(timenow + ' ' + data + '\r\n')
     flog.close()
-    
+
+
+def ClientRegister(data):
+    '''
+    Funcion Register: Asumimos que el valor de option es un Expires correcto
+    '''
+    try:
+        int(sys.argv[3])
+    except ValueError:
+        sys.exit('Usage: python3 uaclient.py config method option')
+        CLog('Finishing.', data[4]['path'])
+            
+    msend = ('REGISTER' + ' sip:' + data[0]['username'] + ':' + data[1]['puerto'] +
+             ' SIP/2.0\r\n' + 'Expires: ' + sys.argv[3] + '\r\n')
+    CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
+    my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
+    return msend
+            
+
+  
 if __name__ == '__main__':
     '''
     Programa principal
@@ -90,6 +109,8 @@ if __name__ == '__main__':
     if SERVERIP == '':
         SERVERIP = '127.0.0.1'
     SERVERPORT = DATAXML[1]['puerto']
+    DATALIST = [USER, PASSWORD, SERVERIP, SERVERPORT]
+    not200 = True
     CLog('Starting...', LOGPATH)
         
     #Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
@@ -98,19 +119,9 @@ if __name__ == '__main__':
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         my_socket.connect((PROXYIP, int(PROXYPORT)))
         
-        #Register: Asumimos que el valor de option es un Expires correcto
-        if METHOD == 'REGISTER': 
-            try:
-                int(OPTION)
-            except ValueError:
-                sys.exit('Usage: python3 uaclient.py config method option')
-                CLog('Finishing.', LOGPATH)
-                    
-            msend = (METHOD + ' sip:' + USER + ':' + SERVERPORT +
-                     ' SIP/2.0\r\n' + 'Expires: ' + OPTION + '\r\n')
-            CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
-            my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
-            
+
+        if METHOD == 'REGISTER':
+            msend = ClientRegister(DATAXML)
         #Invite 
         elif METHOD == 'INVITE':
             if '@' not in OPTION or '.' not in OPTION:
@@ -139,24 +150,24 @@ if __name__ == '__main__':
             CLog('Finishing.', LOGPATH)
             sys.exit('Usage: python3 uaclient.py config method option')
             
-        try:   
+        try:
             data = my_socket.recv(1024).decode('utf-8')
             print(data)
             dataline = data.split('\r\n')
             CLog('Received from ' + PROXYIP + ':' + PROXYPORT + 
                  ': ' + data, LOGPATH)
-                 
             #Autorización del cliente
             if dataline[0].split(' ')[1] == '401':
                 nonce = dataline[1].split('=')[1][1:-1]
-                h = hashlib.sha1(bytes(Password, 'utf-8'))
-                h.update(bytes(NONCE, 'utf-8'))
-                msend = msend + '\r\n' + 'Authorization: Digest response=' + nonce + h.hexdigest() + '\r\n\r\n'
+                h = hashlib.sha1(bytes(PASSWORD, 'utf-8'))
+                h.update(bytes(nonce, 'utf-8'))
+                msend = (msend + '\r\n' + 'Authorization: Digest response="' +
+                         nonce + h.hexdigest() + '"\r\n\r\n')
                 my_socket.send(bytes(msend , 'utf-8') + b'\r\n')
                 CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
                 
             #Envio del ACK
-            if dataline[0].split(' ')[1] == '100':
+            elif dataline[0].split(' ')[1] == '100':
                 my_socket.send(bytes('ACK sip:' + OPTION + 
                                      ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
                 CLog('Sent to ' + PROXYIP + ':' + PROXYPORT +

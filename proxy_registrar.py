@@ -46,30 +46,43 @@ def proxy_parser_xml(fxml):
     parser.parse(open(fxml))
     return (handxml.get_tags())
 
-def DoPassword(path, user):
+def ReadPassword(path, user):
+    '''
+    Función que devuelve la contraseña del usuario en cuestión, leyendo del fichero passwords.txt
+    '''
     fich = open(path, "r")
     lineas= fich.readlines()
     for linea in lineas:
         if linea.split(' ')[0] == user:
             password = linea.split(' ')[1]
-return password
+    return password
+
+def UserDatabase(Userdic,path):
+    '''
+    Función que 
+    '''
+    fich = open(path, "w")
+    for User in Userdic:
+        Info = (Userdic[User][0] + ': ' + str(Userdic[User][1]) +
+               ' ' + str(Userdic[User][2]) + ' ' + str(Userdic[User][3]) + '\r\n')
+        fich.write(Info)
 
 class PHandler(socketserver.DatagramRequestHandler):
     '''
     Handler del Proxy
     '''
     
-    datos = proxy_parser_xml(sys.argv[1])
-    dbpath = datos[1]['path']
-    dbpasswpath = datos[1]['passwdpath']
-    logpath = datos[2]['path']
+    datosxml = proxy_parser_xml(sys.argv[1])
+    dbpath = datosxml[1]['path']
+    dbpasswpath = datosxml[1]['passwdpath']
+    logpath = datosxml[2]['path']
     
     dicdb = {} #Diccionario de listas en el que se van a guardar los usuarios
                #Key: Username; Value: lista que tiene username, userip,
                #userport, userdate(desde 1970) y userexp
     def Register(self, data):
         '''
-        Funcion para guardar los datos de usuario en un diccionario
+        Funcion para el register
         '''
         nonce = '767676'
         user = data[0].split(':')[1]
@@ -83,29 +96,22 @@ class PHandler(socketserver.DatagramRequestHandler):
             self.dicdb[user][3] = userdate
             self.dicdb[user][4] = userexp
         else:
-            try:
-                if data[2].split(':') == 'Authorization':
-                    password = DoPassword(self.datos[1]['passwdpath'], user)
-                    print(password)
-                    h = hashlib.sha1(bytes(password, 'utf-8'))
-                    h.update(bytes(nonce, 'utf-8'))
-                    if data[2].split('=')[1].split('\r')[0][1:-1] == h.hexdigest():
-                        #ok, añadir al dic y al fichero y log
-            except IndexError:
-                self.wfile.write(b'SIP/2.0 401 Unauthorized' + '\r\n' +
-                                  'WWW-Authenticate: Digest nonce="' + 
-                                   nonce + '"' + '\r\n\r\n')
+            if data[2].split(':') == 'Authorization':
+                password = ReadPassword(self.datosxml[1]['passwdpath'], user)
+                print(password)
+                h = hashlib.sha1(bytes(password, 'utf-8'))
+                h.update(bytes(nonce, 'utf-8'))
+                if data[2].split('=')[1].split('\r')[0][1:-1] == h.hexdigest():
+                    #log
+                    self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+                    self.dicdb[user] = [user, userip, userport, userdate, userexp]
+                    UserDatabase(self.dicdb ,self.dbpath)
+            else:
+                self.wfile.write(bytes('SIP/2.0 401 Unauthorized' + '\r\n' +
+                                  'WWW Authenticate: Digest nonce="' + 
+                                   nonce + '"' + '\r\n\r\n', 'utf-8'))
                 #log
-                pass
-            #falta el caso de que la autorización no sea correcta
-            self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
-            self.dicdb[user] = [user, userip, userport, userdate, userexp]
             
-            
-            
-            
-            
-        print(user, userip, userport, userdate, userexp)
         
         
 
@@ -146,14 +152,14 @@ if __name__ == '__main__':
     if len(sys.argv) != 2:
         sys.exit('Usage: python3 proxy_registrar.py config')
     
-    datos = proxy_parser_xml(sys.argv[1])
-    username = datos[0]['name']
+    datosxml = proxy_parser_xml(sys.argv[1])
+    username = datosxml[0]['name']
     if username == '':
         username = 'default'
-    proxyip = datos[0]['ip']
+    proxyip = datosxml[0]['ip']
     if proxyip == '':
         proxyip = '127.0.0.1'
-    proxyport = datos[0]['puerto']
+    proxyport = datosxml[0]['puerto']
     try:
 
         serv = socketserver.UDPServer((proxyip, int(proxyport)), PHandler)
