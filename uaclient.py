@@ -70,7 +70,8 @@ def CLog(data, log):
 
 def ClientRegister(data):
     '''
-    Funcion Register: Asumimos que el valor de option es un Expires correcto
+    Funcion para Register: Asumimos que el valor de option es un Expires correcto
+    Devuelve el mensaje que se envía para reusarlo en la autorización
     '''
     try:
         int(sys.argv[3])
@@ -84,7 +85,22 @@ def ClientRegister(data):
     my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
     return msend
             
-
+def ClientInvite(data, receiver):
+    '''
+    Funcion para Invite:
+    '''
+    if '@' not in receiver or '.' not in receiver:
+        CLog('Finishing.', data[4]['path'])
+        sys.exit('Usage: python3 uaclient.py config method option')
+    else:
+        msend = ('INVITE' + ' sip:' + receiver + ' SIP/2.0\r\n' +
+                 'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
+                 'o=' + data[0]['username'] + ' ' + data[1]['ip'] +
+                 '\r\n' + 's=mysession\r\n' + 't=0\r\n' + 'm=audio ' +
+                  data[2]['puerto'] + ' RTP\r\n')
+        CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
+        my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
+                
   
 if __name__ == '__main__':
     '''
@@ -110,7 +126,6 @@ if __name__ == '__main__':
         SERVERIP = '127.0.0.1'
     SERVERPORT = DATAXML[1]['puerto']
     DATALIST = [USER, PASSWORD, SERVERIP, SERVERPORT]
-    not200 = True
     CLog('Starting...', LOGPATH)
         
     #Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
@@ -119,23 +134,10 @@ if __name__ == '__main__':
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         my_socket.connect((PROXYIP, int(PROXYPORT)))
         
-
         if METHOD == 'REGISTER':
             msend = ClientRegister(DATAXML)
-        #Invite 
         elif METHOD == 'INVITE':
-            if '@' not in OPTION or '.' not in OPTION:
-                CLog('Finishing.', LOGPATH)
-                sys.exit('Usage: python3 uaclient.py config method option')
-            else:
-                msend = (METHOD + ' sip:' + OPTION + ' SIP/2.0\r\n' +
-                         'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
-                         'o=' + USER + ' ' + PROXYIP + '\r\n' + 's=mysession\r\n' +
-                         't=0\r\n' + 'm=audio ' + RTPPORT + ' RTP\r\n')
-                CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
-                my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
-                
-        #Bye 
+            ClientInvite(DATAXML, OPTION)
         elif METHOD == 'BYE':    
             if '@' not in OPTION or '.com' not in OPTION:
                 CLog('Finishing.', LOGPATH)
@@ -162,17 +164,24 @@ if __name__ == '__main__':
                 h = hashlib.sha1(bytes(PASSWORD, 'utf-8'))
                 h.update(bytes(nonce, 'utf-8'))
                 msend = (msend + '\r\n' + 'Authorization: Digest response="' +
-                         nonce + h.hexdigest() + '"\r\n\r\n')
+                         h.hexdigest() + '"\r\n\r\n')
                 my_socket.send(bytes(msend , 'utf-8') + b'\r\n')
                 CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
-                
+                #Esperamos a recibir el Ok
+                data2 = my_socket.recv(1024).decode('utf-8')
+                dataline2 = data2.split('\r\n')
+                CLog('Received from ' + PROXYIP + ':' + PROXYPORT + 
+                     ': ' + data2, LOGPATH)
+                if dataline2[0].split(' ')[1] == '200':
+                    print('Registrado correctamente')
+                else:
+                    sys.exit('no se ha recibido el ok')
             #Envio del ACK
             elif dataline[0].split(' ')[1] == '100':
                 my_socket.send(bytes('ACK sip:' + OPTION + 
                                      ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
                 CLog('Sent to ' + PROXYIP + ':' + PROXYPORT +
-                     ': ' + 'ACK sip:' + OPTION + 
-                     ' SIP/2.0\r\n', LOGPATH)
+                     ': ' + 'ACK sip:' + OPTION + ' SIP/2.0\r\n', LOGPATH)
         #Este error deberia salir al intentar conectar un ua con el servidor proxy apagado.
         except ConnectionRefusedError:
             CLog('Error: No server listening at ' + PROXYIP + ' port ' + PROXYPORT, LOGPATH)

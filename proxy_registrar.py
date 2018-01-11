@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+import hashlib
 import socketserver
 import sys
 import time
@@ -54,7 +55,7 @@ def ReadPassword(path, user):
     lineas= fich.readlines()
     for linea in lineas:
         if linea.split(' ')[0] == user:
-            password = linea.split(' ')[1]
+            password = linea.split(' ')[1][:-1]
     return password
 
 def UserDatabase(Userdic,path):
@@ -90,29 +91,30 @@ class PHandler(socketserver.DatagramRequestHandler):
         userport = data[0].split(' ')[1].split(':')[2]
         userdate = time.time()
         userexp = data[1].split(':')[1][1:]
-        if user in self.dicdb:
+        if user in self.dicdb: # en caso de que el usuario ya esté en el diccionario
             self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
             #log
             self.dicdb[user][3] = userdate
             self.dicdb[user][4] = userexp
         else:
-            if data[2].split(':') == 'Authorization':
-                password = ReadPassword(self.datosxml[1]['passwdpath'], user)
-                print(password)
-                h = hashlib.sha1(bytes(password, 'utf-8'))
-                h.update(bytes(nonce, 'utf-8'))
-                if data[2].split('=')[1].split('\r')[0][1:-1] == h.hexdigest():
-                    #log
-                    self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
-                    self.dicdb[user] = [user, userip, userport, userdate, userexp]
-                    UserDatabase(self.dicdb ,self.dbpath)
-            else:
+            print(data)
+            try:
+                if data[3].split(':')[0] == 'Authorization':
+                    password = ReadPassword(self.datosxml[1]['passwdpath'], user)
+                    h = hashlib.sha1(bytes(password, 'utf-8'))
+                    h.update(bytes(nonce, 'utf-8'))
+                    #comprobamos que las claves son las correctas
+                    if data[3].split('=')[1].split('\r')[0][1:-1] == h.hexdigest():
+                        #log
+                        self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+                        self.dicdb[user] = [user, userip, userport, userdate, userexp]
+                        UserDatabase(self.dicdb ,self.dbpath)
+            except IndexError:
                 self.wfile.write(bytes('SIP/2.0 401 Unauthorized' + '\r\n' +
                                   'WWW Authenticate: Digest nonce="' + 
                                    nonce + '"' + '\r\n\r\n', 'utf-8'))
                 #log
-            
-        
+                print('Index error, no autorizado')
         
 
     def handle(self):
@@ -122,7 +124,6 @@ class PHandler(socketserver.DatagramRequestHandler):
         for line in self.rfile:
             DATOS.append(line.decode('utf-8'))
         #Si la petición está mal formada --> 400
-        print(DATOS)
         if ('sip:' not in DATOS[0].split(' ')[1] 
             or '@' not in DATOS[0].split(' ')[1] 
             or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
@@ -132,6 +133,7 @@ class PHandler(socketserver.DatagramRequestHandler):
                 self.Register(DATOS)
                 print(self.dicdb)
             elif DATOS[0].split(' ')[0] == 'INVITE':#IP y Puerto guardados(nombre) con el register
+                
                 print('INVITE')
             #elif dcline[0] == 'ACK':
                 #os.system('./mp32rtp -i 127.0.0.1 -p 23032 < ' + sys.argv[3])
