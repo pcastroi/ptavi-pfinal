@@ -59,7 +59,7 @@ def parser_xml(fxml):
 
 def CLog(data, log):
     '''
-    Función que crea el log, no está bien aún.
+    Función que crea el log
     '''
     timenow = time.strftime('%Y%m%d%H%M%S', time.gmtime(time.time()))
     flog = open(log, 'a')
@@ -78,16 +78,37 @@ def ClientRegister(data):
     except ValueError:
         sys.exit('Usage: python3 uaclient.py config method option')
         CLog('Finishing.', data[4]['path'])
-            
     msend = ('REGISTER' + ' sip:' + data[0]['username'] + ':' + data[1]['puerto'] +
              ' SIP/2.0\r\n' + 'Expires: ' + sys.argv[3] + '\r\n')
     CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
     my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
-    return msend
-            
+    try:
+        datarec = my_socket.recv(1024).decode('utf-8')
+        dataline = datarec.split('\r\n')
+        CLog('Received from ' + data[3]['ip'] + ':' + data[3]['puerto'] + 
+             ': ' + datarec, data[4]['path'])
+        #Autorización del cliente
+        if dataline[0].split(' ')[1] == '401':
+            nonce = dataline[1].split('=')[1][1:-1]
+            h = hashlib.sha1(bytes(PASSWORD, 'utf-8'))
+            h.update(bytes(nonce, 'utf-8'))
+            msend = (msend + '\r\n' + 'Authorization: Digest response="' +
+                     h.hexdigest() + '"\r\n\r\n')
+            my_socket.send(bytes(msend , 'utf-8') + b'\r\n')
+            CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
+            data2 = my_socket.recv(1024).decode('utf-8')
+            dataline2 = data2.split('\r\n')
+            CLog('Received from ' + data[3]['ip'] + ':' +
+                 data[3]['puerto'] + ': '+ data2, data[4]['path'])
+            CLog('Finishing.', data[4]['path'])
+    #Este error deberia salir al intentar conectar un ua con el servidor proxy apagado.
+    except ConnectionRefusedError:
+        CLog('Error: No server listening at ' + data[3]['ip'] + ' port ' + data[3]['puerto'], data[4]['path'])
+        CLog('Finishing.', data[4]['path'])
+        
 def ClientInvite(data, receiver):
     '''
-    Funcion para Invite: comprueba que el parámetro introducido es el correcto
+    Funcion para Invite: el valor de option se comprueba en el proxy(error 404)
     '''
     msend = ('INVITE' + ' sip:' + receiver + ' SIP/2.0\r\n' +
              'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
@@ -96,9 +117,40 @@ def ClientInvite(data, receiver):
               data[2]['puerto'] + ' RTP\r\n')
     CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
     my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
-    data = my_socket.recv(1024).decode('utf-8')
-    print('datos:', data)
-  
+    datarec = my_socket.recv(1024).decode('utf-8')
+    CLog('Received from ' + data[3]['ip'] + ':' +
+         data[3]['puerto'] + ': ' + datarec, data[4]['path'])
+    dataline = datarec.split('\r\n')
+    print(datarec)
+    #recibo el 100, 180, 200 y sdp. Mando el ACK
+    if dataline[0].split(' ')[1] == '100':
+        my_socket.send(bytes('ACK sip:' + receiver + 
+                             ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
+        CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' +
+             'ACK sip:' + receiver + ' SIP/2.0\r\n', data[4]['path'])
+        #Una vez mandado el Ack, mando los datos RTP
+        os.system('./mp32rtp -i ' + data[1]['ip'] + '-p ' + data[2]['puerto'] +
+                  ' < ' + data[5]['path'])
+    if dataline[0].split(' ')[1] == '404' or dataline[0].split(' ')[1] == '400':
+        CLog('Error: ' + datarec, data[4]['path'])
+        CLog('Finishing.', data[4]['path'])
+        
+def ClientBye(data, receiver):
+    '''
+    Funcion para Bye: comprueba que el parámetro introducido es el correcto
+    '''
+    if '@' not in receiver or '.com' not in receiver:
+        CLog('Finishing.', data[4]['path'])
+    else:
+        my_socket.send(bytes('BYE sip:' + receiver + ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
+        CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] +
+             ': ' + 'BYE sip:' + receiver + ' SIP/2.0\r\n', data[4]['path'])
+        #recibo el ok
+        print('recibo el ok del bye')
+        datarec = my_socket.recv(1024).decode('utf-8')
+        CLog('Received from ' + data[3]['ip'] + ':' +
+             data[3]['puerto'] + ': ' + datarec, data[4]['path'])
+        dataline = datarec.split('\r\n')
 if __name__ == '__main__':
     '''
     Programa principal
@@ -132,58 +184,14 @@ if __name__ == '__main__':
         my_socket.connect((PROXYIP, int(PROXYPORT)))
         
         if METHOD == 'REGISTER':
-            msend = ClientRegister(DATAXML)
+            ClientRegister(DATAXML)
         elif METHOD == 'INVITE':
             ClientInvite(DATAXML, OPTION)
-        elif METHOD == 'BYE':    
-            if '@' not in OPTION or '.com' not in OPTION:
-                CLog('Finishing.', LOGPATH)
-                sys.exit('Usage: python3 uaclient.py config method option')
-            else:
-                my_socket.send(bytes('BYE sip:' + OPTION + ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
-                CLog('Sent to ' + PROXYIP + ':' + PROXYPORT +
-                     ': ' + 'BYE sip:' + OPTION + ' SIP/2.0\r\n', LOGPATH)
-                
+        elif METHOD == 'BYE': 
+            ClientBye(DATAXML, OPTION)
         #Excepción si el método introducido no es válido 
         else:
             CLog('Finishing.', LOGPATH)
             sys.exit('Usage: python3 uaclient.py config method option')
-            
-        try:
-            data = my_socket.recv(1024).decode('utf-8')
-            print(data)
-            dataline = data.split('\r\n')
-            print(dataline)
-            CLog('Received from ' + PROXYIP + ':' + PROXYPORT + 
-                 ': ' + data, LOGPATH)
-            #Autorización del cliente
-            if dataline[0].split(' ')[1] == '401':
-                nonce = dataline[1].split('=')[1][1:-1]
-                h = hashlib.sha1(bytes(PASSWORD, 'utf-8'))
-                h.update(bytes(nonce, 'utf-8'))
-                msend = (msend + '\r\n' + 'Authorization: Digest response="' +
-                         h.hexdigest() + '"\r\n\r\n')
-                my_socket.send(bytes(msend , 'utf-8') + b'\r\n')
-                CLog('Sent to ' + PROXYIP + ':' + PROXYPORT + ': ' + msend, LOGPATH)
-                #Esperamos a recibir el Ok
-                data2 = my_socket.recv(1024).decode('utf-8')
-                dataline2 = data2.split('\r\n')
-                CLog('Received from ' + PROXYIP + ':' + PROXYPORT + 
-                     ': ' + data2, LOGPATH)
-                if dataline2[0].split(' ')[1] == '200':
-                    print('Registrado correctamente')
-                else:
-                    sys.exit('no se ha recibido el ok')
-            #Envio del ACK
-            elif dataline[0].split(' ')[1] == '100':
-                my_socket.send(bytes('ACK sip:' + OPTION + 
-                                     ' SIP/2.0\r\n', 'utf-8') + b'\r\n')
-                CLog('Sent to ' + PROXYIP + ':' + PROXYPORT +
-                     ': ' + 'ACK sip:' + OPTION + ' SIP/2.0\r\n', LOGPATH)
-        #Este error deberia salir al intentar conectar un ua con el servidor proxy apagado.
-        except ConnectionRefusedError:
-            CLog('Error: No server listening at ' + PROXYIP + ' port ' + PROXYPORT, LOGPATH)
-            CLog('Finishing.', LOGPATH)
-            sys.exit('Connection Refused Error')
-            
+
         CLog('Finishing.', LOGPATH)

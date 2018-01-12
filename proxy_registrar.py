@@ -120,7 +120,7 @@ class PHandler(socketserver.DatagramRequestHandler):
         
     def Invite(self, data):
         '''
-        Función para el Invite, reenvía al server
+        Función para reeenviar el Invite al server y reenvio el 100, 180,...
         '''
         user = data[0].split(':')[1].split(' ')[0]
         if user in self.dicdb:
@@ -128,18 +128,43 @@ class PHandler(socketserver.DatagramRequestHandler):
                 my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
                 my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
-                data = my_socket.recv(1024).decode('utf-8')
-                print(data)
-                self.wfile.write(bytes(data, 'utf-8'))
+                #log
+                datarec = my_socket.recv(1024).decode('utf-8')
+                self.wfile.write(bytes(datarec, 'utf-8'))
+                #log
         else: #404 User not found
+            #log
             self.wfile.write(bytes('SIP/2.0 404 User Not Found' + '\r\n', 'utf-8'))
-    
+
+    def Ack(self, data):
+        '''
+        Funcion para reenviar el Ack al server
+        '''
+        user = data[0].split(':')[1].split(' ')[0]
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
+            my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
+            my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
+            
+    def Bye(self, data):
+        '''
+        Funcion para reenviar el Bye al server y reeenvio el 200
+        '''
+        user = data[0].split(':')[1].split(' ')[0]
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
+            my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
+            my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
+            #log
+            datarec = my_socket.recv(1024).decode('utf-8')
+            self.wfile.write(bytes(datarec, 'utf-8'))
+            #log
+            
     def handle(self):
     
         DATOS = []
         for line in self.rfile:
             DATOS.append(line.decode('utf-8'))
-        #Si la petición está mal formada --> 400
         if ('sip:' not in DATOS[0].split(' ')[1] 
             or '@' not in DATOS[0].split(' ')[1] 
             or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
@@ -149,13 +174,10 @@ class PHandler(socketserver.DatagramRequestHandler):
                 self.Register(DATOS)
             elif DATOS[0].split(' ')[0] == 'INVITE':
                 self.Invite(DATOS)
-            #elif dcline[0] == 'ACK':
-                #os.system('./mp32rtp -i 127.0.0.1 -p 23032 < ' + sys.argv[3])
+            elif DATOS[0].split(' ')[0] == 'ACK':
+                self.Ack(DATOS)
             elif DATOS[0].split(' ')[0] == 'BYE':
-                self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
-                 
-                #401 y 404
-
+                self.Bye(DATOS)
             else:
                 self.wfile.write(bytes('SIP/2.0 405 Method Not ' +
                                                'Allowed\r\n\r\n', 'utf-8'))
