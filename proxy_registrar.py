@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import hashlib
+import socket
 import socketserver
 import sys
 import time
@@ -60,12 +61,13 @@ def ReadPassword(path, user):
 
 def UserDatabase(Userdic,path):
     '''
-    Función que 
+    Función que escribe en un fichero de texto "user: ip port time expires"
     '''
     fich = open(path, "w")
     for User in Userdic:
         Info = (Userdic[User][0] + ': ' + str(Userdic[User][1]) +
-               ' ' + str(Userdic[User][2]) + ' ' + str(Userdic[User][3]) + '\r\n')
+                ' ' + str(Userdic[User][2]) + ' ' + str(Userdic[User][3]) + 
+                ' ' + str(Userdic[User][4]) + '\r\n')
         fich.write(Info)
 
 class PHandler(socketserver.DatagramRequestHandler):
@@ -96,8 +98,8 @@ class PHandler(socketserver.DatagramRequestHandler):
             #log
             self.dicdb[user][3] = userdate
             self.dicdb[user][4] = userexp
+            UserDatabase(self.dicdb ,self.dbpath)
         else:
-            print(data)
             try:
                 if data[3].split(':')[0] == 'Authorization':
                     password = ReadPassword(self.datosxml[1]['passwdpath'], user)
@@ -116,7 +118,19 @@ class PHandler(socketserver.DatagramRequestHandler):
                 #log
                 print('Index error, no autorizado')
         
-
+    def Invite(self, data):
+        '''
+        Función para el Invite
+        '''
+        user = data[0].split(':')[1].split(' ')[0]
+        if user in self.dicdb:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
+                my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
+                my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
+        else: #404 User not found
+            self.wfile.write(bytes('SIP/2.0 404 User Not Found' + '\r\n', 'utf-8'))
+    
     def handle(self):
     
         DATOS = []
@@ -127,14 +141,16 @@ class PHandler(socketserver.DatagramRequestHandler):
         if ('sip:' not in DATOS[0].split(' ')[1] 
             or '@' not in DATOS[0].split(' ')[1] 
             or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
-            self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+            
+            if DATOS[0].split(' ')[1] == '100':#reenviar el 100, 180, 200 + SDP
+                self.wfile.write(bytes(DATOS + '\r\n', 'utf-8'))
+            else:
+                self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
         else:
             if DATOS[0].split(' ')[0] == 'REGISTER':
                 self.Register(DATOS)
-                print(self.dicdb)
-            elif DATOS[0].split(' ')[0] == 'INVITE':#IP y Puerto guardados(nombre) con el register
-                
-                print('INVITE')
+            elif DATOS[0].split(' ')[0] == 'INVITE':
+                self.Invite(DATOS)
             #elif dcline[0] == 'ACK':
                 #os.system('./mp32rtp -i 127.0.0.1 -p 23032 < ' + sys.argv[3])
             elif DATOS[0].split(' ')[0] == 'BYE':
@@ -146,7 +162,7 @@ class PHandler(socketserver.DatagramRequestHandler):
                 self.wfile.write(bytes('SIP/2.0 405 Method Not ' +
                                                'Allowed\r\n\r\n', 'utf-8'))
 
-      
+            print(self.dicdb)
 
 
 if __name__ == '__main__':
@@ -163,7 +179,6 @@ if __name__ == '__main__':
         proxyip = '127.0.0.1'
     proxyport = datosxml[0]['puerto']
     try:
-
         serv = socketserver.UDPServer((proxyip, int(proxyport)), PHandler)
         print('Server ' + username + ' listening at port ' + proxyport + '...')
         serv.serve_forever()

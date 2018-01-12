@@ -87,19 +87,15 @@ def ClientRegister(data):
             
 def ClientInvite(data, receiver):
     '''
-    Funcion para Invite:
+    Funcion para Invite: comprueba que el parámetro introducido es el correcto
     '''
-    if '@' not in receiver or '.' not in receiver:
-        CLog('Finishing.', data[4]['path'])
-        sys.exit('Usage: python3 uaclient.py config method option')
-    else:
-        msend = ('INVITE' + ' sip:' + receiver + ' SIP/2.0\r\n' +
-                 'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
-                 'o=' + data[0]['username'] + ' ' + data[1]['ip'] +
-                 '\r\n' + 's=mysession\r\n' + 't=0\r\n' + 'm=audio ' +
-                  data[2]['puerto'] + ' RTP\r\n')
-        CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
-        my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
+    msend = ('INVITE' + ' sip:' + receiver + ' SIP/2.0\r\n' +
+             'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
+             'o=' + data[0]['username'] + ' ' + data[1]['ip'] +
+             '\r\n' + 's=mysession\r\n' + 't=0\r\n' + 'm=audio ' +
+              data[2]['puerto'] + ' RTP\r\n')
+    CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
+    my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
                 
   
 if __name__ == '__main__':
@@ -187,8 +183,5 @@ if __name__ == '__main__':
             CLog('Error: No server listening at ' + PROXYIP + ' port ' + PROXYPORT, LOGPATH)
             CLog('Finishing.', LOGPATH)
             sys.exit('Connection Refused Error')
-        #Error cuando no responde el proxy
-        except IndexError:
-            sys.exit('No response')
             
         CLog('Finishing.', LOGPATH)
