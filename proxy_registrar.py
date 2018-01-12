@@ -6,8 +6,10 @@ import socket
 import socketserver
 import sys
 import time
+import uaclient
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
+
 
 class PXMLHandler(ContentHandler):
 
@@ -53,7 +55,7 @@ def ReadPassword(path, user):
     Función que devuelve la contraseña del usuario en cuestión, leyendo del fichero passwords.txt
     '''
     fich = open(path, "r")
-    lineas= fich.readlines()
+    lineas = fich.readlines()
     for linea in lineas:
         if linea.split(' ')[0] == user:
             password = linea.split(' ')[1][:-1]
@@ -67,7 +69,7 @@ def UserDatabase(Userdic,path):
     for User in Userdic:
         Info = (Userdic[User][0] + ': ' + str(Userdic[User][1]) +
                 ' ' + str(Userdic[User][2]) + ' ' + str(Userdic[User][3]) + 
-                ' ' + str(Userdic[User][4]) + '\r\n')
+                ' ' + str(Userdic[User][4]))
         fich.write(Info)
 
 class PHandler(socketserver.DatagramRequestHandler):
@@ -80,9 +82,9 @@ class PHandler(socketserver.DatagramRequestHandler):
     dbpasswpath = datosxml[1]['passwdpath']
     logpath = datosxml[2]['path']
     
-    dicdb = {} #Diccionario de listas en el que se van a guardar los usuarios
-               #Key: Username; Value: lista que tiene username, userip,
-               #userport, userdate(desde 1970) y userexp
+    dicdb = {} # Diccionario de listas en el que se van a guardar los usuarios
+               # Key: Username; Value: lista que tiene username, userip,
+               # userport, userdate(desde 1970) y userexp
     def Register(self, data):
         '''
         Funcion para el register
@@ -94,8 +96,11 @@ class PHandler(socketserver.DatagramRequestHandler):
         userdate = time.time()
         userexp = data[1].split(':')[1][1:]
         if user in self.dicdb: # en caso de que el usuario ya esté en el diccionario
-            self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
-            #log
+            msend = 'SIP/2.0 200 OK\r\n\r\n'
+            uaclient.CLog('Sent to ' + userip + ':' +
+                          userport + ': ' +
+                          msend, datosxml[2]['path'])
+            self.wfile.write(bytes(msend, 'utf-8'))
             self.dicdb[user][3] = userdate
             self.dicdb[user][4] = userexp
             UserDatabase(self.dicdb ,self.dbpath)
@@ -107,58 +112,89 @@ class PHandler(socketserver.DatagramRequestHandler):
                     h.update(bytes(nonce, 'utf-8'))
                     #comprobamos que las claves son las correctas
                     if data[3].split('=')[1].split('\r')[0][1:-1] == h.hexdigest():
-                        #log
-                        self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+                        msend = 'SIP/2.0 200 OK\r\n\r\n'
+                        uaclient.CLog('Sent to ' + userip + ':' +
+                                      userport + ': ' +
+                                      msend, datosxml[2]['path'])
+                        self.wfile.write(bytes(msend, 'utf-8'))
                         self.dicdb[user] = [user, userip, userport, userdate, userexp]
                         UserDatabase(self.dicdb ,self.dbpath)
             except IndexError:
-                self.wfile.write(bytes('SIP/2.0 401 Unauthorized' + '\r\n' +
-                                  'WWW Authenticate: Digest nonce="' + 
-                                   nonce + '"' + '\r\n\r\n', 'utf-8'))
-                #log
-                print('Index error, no autorizado')
+                msend = ('SIP/2.0 401 Unauthorized' + '\r\n' +
+                        'WWW Authenticate: Digest nonce="' + 
+                        nonce + '"' + '\r\n\r\n')
+                uaclient.CLog('Sent to ' + userip + ':' +
+                               userport + ': ' + msend, datosxml[2]['path'])
+                self.wfile.write(bytes(msend, 'utf-8'))
         
     def Invite(self, data):
         '''
         Función para reeenviar el Invite al server y reenvio el 100, 180,...
         '''
+        datosxml = proxy_parser_xml(sys.argv[1])
         user = data[0].split(':')[1].split(' ')[0]
         if user in self.dicdb:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
                 my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
-                my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
-                #log
-                datarec = my_socket.recv(1024).decode('utf-8')
-                self.wfile.write(bytes(datarec, 'utf-8'))
-                #log
+                msend = ''.join(data)
+                uaclient.CLog('Sent to ' + self.dicdb[user][1] + ':' +
+                              str(self.dicdb[user][2]) + ': ' +
+                              msend + '\r\n', datosxml[2]['path'])
+                my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
+                msend = my_socket.recv(1024).decode('utf-8')
+                uaclient.CLog('Received from 127.0.0.1:6003: ' +
+                              msend + '\r\n', datosxml[2]['path'])
+                self.wfile.write(bytes(msend, 'utf-8'))
+                uaclient.CLog('Sent to ' + self.dicdb[user][1] + ':' +
+                              str(self.dicdb[user][2]) + ': ' +
+                              msend + '\r\n', datosxml[2]['path'])
         else: #404 User not found
-            #log
-            self.wfile.write(bytes('SIP/2.0 404 User Not Found' + '\r\n', 'utf-8'))
+            msend = 'SIP/2.0 404 User Not Found' + '\r\n'
+            uaclient.CLog('Sent to 127.0.0.1:6001: ' +
+                          msend + '\r\n', datosxml[2]['path'])
+            self.wfile.write(bytes(msend, 'utf-8'))
 
     def Ack(self, data):
         '''
         Funcion para reenviar el Ack al server
         '''
+        datosxml = proxy_parser_xml(sys.argv[1])
         user = data[0].split(':')[1].split(' ')[0]
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
             my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
-            my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
+            msend = ''.join(data)
+            uaclient.CLog('Sent to ' + self.dicdb[user][1] + ':' +
+                          str(self.dicdb[user][2]) + ': ' +
+                          msend + '\r\n', datosxml[2]['path'])
+            my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
             
     def Bye(self, data):
         '''
         Funcion para reenviar el Bye al server y reeenvio el 200
         '''
+        datosxml = proxy_parser_xml(sys.argv[1])
         user = data[0].split(':')[1].split(' ')[0]
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
-            my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
-            my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
-            #log
-            datarec = my_socket.recv(1024).decode('utf-8')
-            self.wfile.write(bytes(datarec, 'utf-8'))
-            #log
+        if user in self.dicdb:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
+                my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
+                msend = ''.join(data)
+                uaclient.CLog('Sent to ' + self.dicdb[user][1] + ':' +
+                              str(self.dicdb[user][2]) + ': ' +
+                              msend + '\r\n', datosxml[2]['path'])
+                my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
+                msend = my_socket.recv(1024).decode('utf-8')
+                uaclient.CLog('Received from 127.0.0.1:6003: ' +
+                              msend + '\r\n', datosxml[2]['path'])
+                self.wfile.write(bytes(msend, 'utf-8'))
+        else: #404 User not found
+            msend = 'SIP/2.0 404 User Not Found' + '\r\n'
+            uaclient.CLog('Sent to ' + self.dicdb[user][1] + ':' +
+                          str(self.dicdb[user][2]) + ': ' +
+                          msend + '\r\n', datosxml[2]['path'])
+            self.wfile.write(bytes(msend, 'utf-8'))
             
     def handle(self):
     
@@ -168,7 +204,11 @@ class PHandler(socketserver.DatagramRequestHandler):
         if ('sip:' not in DATOS[0].split(' ')[1] 
             or '@' not in DATOS[0].split(' ')[1] 
             or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
-            self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+            msend = 'SIP/2.0 400 Bad Request\r\n\r\n'
+            uaclient.CLog('Sent to ' + self.dicdb[username][1] + ':' +
+                          int(self.dicdb[username][2]) + ': ' +
+                          msend + '\r\n', datosxml[2]['path'])
+            self.wfile.write(bytes(msend, 'utf-8'))
         else:
             if DATOS[0].split(' ')[0] == 'REGISTER':
                 self.Register(DATOS)
@@ -179,12 +219,11 @@ class PHandler(socketserver.DatagramRequestHandler):
             elif DATOS[0].split(' ')[0] == 'BYE':
                 self.Bye(DATOS)
             else:
-                self.wfile.write(bytes('SIP/2.0 405 Method Not ' +
-                                               'Allowed\r\n\r\n', 'utf-8'))
-            
-            print(DATOS)
-            #print(self.dicdb)
-
+                msend = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
+                uaclient.CLog('Sent to ' + self.dicdb[username][1] + ':' +
+                              int(self.dicdb[username][2]) + ': ' +
+                              msend + '\r\n', datosxml[2]['path'])
+                self.wfile.write(bytes(msend, 'utf-8'))
 
 if __name__ == '__main__':
 
@@ -199,9 +238,11 @@ if __name__ == '__main__':
     if proxyip == '':
         proxyip = '127.0.0.1'
     proxyport = datosxml[0]['puerto']
+    uaclient.CLog('Starting...', datosxml[2]['path'])
     try:
         serv = socketserver.UDPServer((proxyip, int(proxyport)), PHandler)
         print('Server ' + username + ' listening at port ' + proxyport + '...')
         serv.serve_forever()
     except KeyboardInterrupt:
         print('Finalizado servidor proxy')
+        uaclient.CLog('Finishing.', datosxml[2]['path'])
