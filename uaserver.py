@@ -5,6 +5,7 @@ Clase (y programa principal) para un servidor de eco en UDP simple
 '''
 
 import os
+import socket
 import socketserver
 import sys
 import uaclient 
@@ -16,7 +17,9 @@ class SHandler(socketserver.DatagramRequestHandler):
     def handle(self):
     
         DATOS = []
-        DATAXML = uaclient.parser_xml(sys.argv[1])    
+        DATAXML = uaclient.parser_xml(sys.argv[1])
+        PROXYIP = DATAXML[3]['ip']
+        PROXYPORT = DATAXML[3]['puerto'] 
 
         for line in self.rfile:
             DATOS.append(line.decode('utf-8'))
@@ -27,13 +30,17 @@ class SHandler(socketserver.DatagramRequestHandler):
         if DATOS[0].split(' ')[0] == 'INVITE':
             print(DATAXML)
             print(DATOS)
-            self.wfile.write(bytes('SIP/2.0 100 Trying\r\n\r\n' +
-                 'SIP/2.0 180 Ringing\r\n\r\n' + 'SIP/2.0 200 OK\r\n\r\n' +
-                 'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
-                 'o=' + DATAXML[0]['username'] + ' ' + DATAXML[1]['ip'] +
-                 '\r\n' + 's=mysession\r\n' + 't=0\r\n' + 'm=audio ' +
-                 str(DATAXML[2]['puerto']) + ' RTP\r\n', 'utf-8'))
-        
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
+
+                my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                my_socket.connect((PROXYIP, int(PROXYPORT)))
+                my_socket.send(bytes('SIP/2.0 100 Trying\r\n\r\n' +
+                     'SIP/2.0 180 Ringing\r\n\r\n' + 'SIP/2.0 200 OK\r\n\r\n' +
+                     'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
+                     'o=' + DATAXML[0]['username'] + ' ' + DATAXML[1]['ip'] +
+                     '\r\n' + 's=mysession\r\n' + 't=0\r\n' + 'm=audio ' +
+                     str(DATAXML[2]['puerto']) + ' RTP\r\n', 'utf-8'))
+            
         
         
     

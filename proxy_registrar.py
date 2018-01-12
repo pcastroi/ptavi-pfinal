@@ -120,7 +120,7 @@ class PHandler(socketserver.DatagramRequestHandler):
         
     def Invite(self, data):
         '''
-        Función para el Invite
+        Función para el Invite, reenvía al server
         '''
         user = data[0].split(':')[1].split(' ')[0]
         if user in self.dicdb:
@@ -134,7 +134,6 @@ class PHandler(socketserver.DatagramRequestHandler):
     def handle(self):
     
         DATOS = []
-        
         for line in self.rfile:
             DATOS.append(line.decode('utf-8'))
         #Si la petición está mal formada --> 400
@@ -142,8 +141,9 @@ class PHandler(socketserver.DatagramRequestHandler):
             or '@' not in DATOS[0].split(' ')[1] 
             or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
             
-            if DATOS[0].split(' ')[1] == '100':#reenviar el 100, 180, 200 + SDP
-                self.wfile.write(bytes(DATOS + '\r\n', 'utf-8'))
+            if DATOS[0].split(' ')[1] == '100':#reenviar el 100, 180, 200 + SDP al client
+                print('envío:',''.join(DATOS))
+                self.wfile.write(bytes(''.join(DATOS) + '\r\n', 'utf-8'))
             else:
                 self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
         else:
@@ -161,8 +161,9 @@ class PHandler(socketserver.DatagramRequestHandler):
             else:
                 self.wfile.write(bytes('SIP/2.0 405 Method Not ' +
                                                'Allowed\r\n\r\n', 'utf-8'))
-
-            print(self.dicdb)
+            
+            print(DATOS)
+            #print(self.dicdb)
 
 
 if __name__ == '__main__':

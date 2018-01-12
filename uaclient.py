@@ -152,6 +152,7 @@ if __name__ == '__main__':
             data = my_socket.recv(1024).decode('utf-8')
             print(data)
             dataline = data.split('\r\n')
+            print(dataline)
             CLog('Received from ' + PROXYIP + ':' + PROXYPORT + 
                  ': ' + data, LOGPATH)
             #Autorización del cliente
