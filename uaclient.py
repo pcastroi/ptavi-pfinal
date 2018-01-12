@@ -96,7 +96,8 @@ def ClientInvite(data, receiver):
               data[2]['puerto'] + ' RTP\r\n')
     CLog('Sent to ' + data[3]['ip'] + ':' + data[3]['puerto'] + ': ' + msend, data[4]['path'])
     my_socket.send(bytes(msend, 'utf-8') + b'\r\n')
-                
+    data = my_socket.recv(1024).decode('utf-8')
+    print('datos:', data)
   
 if __name__ == '__main__':
     '''

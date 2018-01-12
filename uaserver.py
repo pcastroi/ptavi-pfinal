@@ -30,11 +30,7 @@ class SHandler(socketserver.DatagramRequestHandler):
         if DATOS[0].split(' ')[0] == 'INVITE':
             print(DATAXML)
             print(DATOS)
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
-
-                my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                my_socket.connect((PROXYIP, int(PROXYPORT)))
-                my_socket.send(bytes('SIP/2.0 100 Trying\r\n\r\n' +
+            self.wfile.write(bytes('SIP/2.0 100 Trying\r\n\r\n' +
                      'SIP/2.0 180 Ringing\r\n\r\n' + 'SIP/2.0 200 OK\r\n\r\n' +
                      'Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
                      'o=' + DATAXML[0]['username'] + ' ' + DATAXML[1]['ip'] +

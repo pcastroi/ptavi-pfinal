@@ -128,6 +128,9 @@ class PHandler(socketserver.DatagramRequestHandler):
                 my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 my_socket.connect((self.dicdb[user][1], int(self.dicdb[user][2])))
                 my_socket.send(bytes(''.join(data), 'utf-8') + b'\r\n')
+                data = my_socket.recv(1024).decode('utf-8')
+                print(data)
+                self.wfile.write(bytes(data, 'utf-8'))
         else: #404 User not found
             self.wfile.write(bytes('SIP/2.0 404 User Not Found' + '\r\n', 'utf-8'))
     
@@ -140,12 +143,7 @@ class PHandler(socketserver.DatagramRequestHandler):
         if ('sip:' not in DATOS[0].split(' ')[1] 
             or '@' not in DATOS[0].split(' ')[1] 
             or DATOS[0].split(' ')[2] != 'SIP/2.0\r\n'):
-            
-            if DATOS[0].split(' ')[1] == '100':#reenviar el 100, 180, 200 + SDP al client
-                print('envío:',''.join(DATOS))
-                self.wfile.write(bytes(''.join(DATOS) + '\r\n', 'utf-8'))
-            else:
-                self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+            self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
         else:
             if DATOS[0].split(' ')[0] == 'REGISTER':
                 self.Register(DATOS)
