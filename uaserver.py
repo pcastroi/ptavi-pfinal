@@ -52,7 +52,7 @@ if __name__ == '__main__':
         sys.exit('Usage: python3 uaserver.py config')
     DATAXML = uaclient.parser_xml(sys.argv[1])
     DATAXML[1]['ip'] = '127.0.0.1'
-    DATAXML[1]['puerto'] == PORT
+    PORT = DATAXML[1]['puerto']
     uaclient.CLog('Starting...', DATAXML[4]['path'])
     try:
         serv = socketserver.UDPServer((DATAXML[1]['ip'], int(PORT)), SHandler)
